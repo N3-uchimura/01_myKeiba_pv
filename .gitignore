@@ -1,0 +1,12 @@
+/node_modules/
+.env
+.manenv
+package-lock.json
+/output/
+/build/
+/csv/
+man.env
+appx_setting.json
+/dist/
+man.env
+/assets/.env

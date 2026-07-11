@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8" />
+  <title>Data HorseData Scraper</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline';">
+  <link rel="stylesheet" href="css/index.css">
+  <link rel="stylesheet" href="css/flatpickr.min.css">
+  <script src="js/flatpickr.min.js"></script>
+  <script src="js/ja.min.js"></script>
+</head>
+
+<body>
+  <h1 id="maintitle">Data HorseData Scraper</h1>
+  <div id="buttonarea" class="buttonarea">
+    <div class="operation_area">
+      <div class="operation_area">
+        <h3 id="getcrops">Get Crop Results</h3>
+        <button id="getcrops_button" class="button-g button-wide" value="crops" onclick="getCropResults();">Get Crop
+          Results</button>
+      </div>
+      <div class="operation_area">
+        <h3 id="gettraining">Get Trainings</h3>
+        <span id="racingdate">Racing Date</span><br>
+        <input type="text" id="flatpickr"><br><br>
+        <div id="selectarea">
+          <input type="radio" name="mode" value="all" checked><label id="all" for="all">All</label>
+          <input type="radio" name="mode" value="east"><label id="east" for="east">EAST</label>
+          <input type="radio" name="mode" value="west"><label id="west" for="west">WEST</label>
+          <input type="radio" name="mode" value="local"><label id="local" for="local">LOCAL</label>
+        </div>
+        <button id="gettraining_button" class="button-g button-wide" value="trainings" onclick="getTrainings();">Get
+          Trainings</button>
+      </div>
+      <div class="operation_area">
+        <button id="config_button" class="button-g button-6 button-wide" value="config"
+          onclick="configPage();">Config</button>
+      </div>
+      <div class="status_area">
+        <div id="status"></div>
+        <div id="targetpage"></div>
+      </div>
+      <div class="status_area">
+        <div><span id="place"></span></div>
+        <div><span id="successhead">success:</span><span id="success"></span>/<span id="successtotal"></span></div>
+        <div><span id="failhead">fail:</span><span id="fail"></span>/<span id="failtotal"></span></div>
+      </div>
+      <div class="operation_area">
+        <button id="exit_button" class="button-g button-1 button-wide" value="exit" onclick="exitPage();">Exit</button>
+      </div>
+    </div>
+    <dialog id="modalDialog" class="dialog">
+      <div id="dialog-container">
+        <div id="dialog-title">Select CSV File</div>
+        <select id="fileSelect" name="csvs">
+          <option value="0">-- select file --</option>
+        </select>
+        <button id="okButton" value="OK">OK</button>
+        <button id="ngButton" value="NG">CAN</button>
+      </div>
+    </dialog>
+    <footer>
+      <p><small>&copy; 2025 Nthree LLC All Rights Reserved. </small></p>
+    </footer>
+
+    <script charset="UTF-8">
+      /// variables
+      let globalfileList = []; // filelist
+      let japaneseFlg = true; // japanese flg
+      /// constants
+      // japanese
+      const APPNAME_STR_JA = '競馬スクレイピングツール';
+      const DATE_STR_JA = '開催日';
+      const GETCROPS_STR_JA = '産駒成績取得';
+      const GETTRAINING_STR_JA = '調教取得';
+      const ALL_STR_JA = '全';
+      const EAST_STR_JA = '関東';
+      const WEST_STR_JA = '関西';
+      const LOCAL_STR_JA = 'ローカル';
+      const CONFIG_STR_JA = '設定';
+      const SUCCESS_STR_JA = '成功:';
+      const FAIL_STR_JA = '失敗:';
+      const SELECTCSV_STR_JA = 'CSVファイルを選んでください。';
+      const EXIT_STR_JA = '終了';
+      // english
+      const APPNAME_STR_EN = 'Data HorseData Scraper';
+      const DATE_STR_EN = 'Racing Date';
+      const GETCROPS_STR_EN = 'Get Crop Results';
+      const GETTRAINING_STR_EN = 'Get Trainings';
+      const ALL_STR_EN = 'ALL';
+      const EAST_STR_EN = 'EAST';
+      const WEST_STR_EN = 'WEST';
+      const LOCAL_STR_EN = 'LOCAL';
+      const CONFIG_STR_EN = 'Config';
+      const SUCCESS_STR_EN = 'success:';
+      const FAIL_STR_EN = 'fail:';
+      const SELECTCSV_STR_EN = 'Select CSV File';
+      const EXIT_STR_EN = 'Exit';
+      // doms
+      const pageDom = document.getElementById('targetpage');
+      const statusDom = document.getElementById('status');
+      const maintitleDom = document.getElementById("maintitle");
+      const allDom = document.getElementById('all');
+      const eastDom = document.getElementById('east');
+      const westDom = document.getElementById('west');
+      const localDom = document.getElementById('local');
+      const getcropsDom = document.getElementById("getcrops");
+      const getcropsButtonDom = document.getElementById("getcrops_button");
+      const gettrainingDom = document.getElementById("gettraining");
+      const gettrainingButtonDom = document.getElementById("gettraining_button");
+      const getconfigButtonDom = document.getElementById("config_button");
+      const exitDom = document.getElementById("exit_button");
+      const successHeadDom = document.getElementById('successhead');
+      const successDom = document.getElementById('success');
+      const failHeadDom = document.getElementById('failhead');
+      const failDom = document.getElementById('fail');
+      const racePlaceDom = document.getElementById('place');
+      const successtotalDom = document.getElementById('successtotal');
+      const failtotalDom = document.getElementById('failtotal');
+      const selectBoxDom = document.getElementById("fileSelect");
+      const modalDialogDom = document.getElementById('modalDialog');
+      const dialogTitleDom = document.getElementById('dialog-title');
+      const okButtonDom = document.getElementById('okButton');
+      const ngButtonDom = document.getElementById('ngButton');
+      const dateDom = document.getElementById("flatpickr");
+      const racingdateDom = document.getElementById("racingdate");
+
+      /// ipc
+      // before ready
+      window.api.send("beforeready");
+
+      // be ready
+      window.api.on("ready", arg => {
+        console.log(arg);
+        // init calender
+        flatpickr("#flatpickr", {
+          locale: "ja",
+          enableTime: false,
+          dateFormat: 'Y-m-d',
+          onChange: function (_, dateStr) {
+            // send date
+            window.api.send("date", dateStr);
+          }
+        });
+        // change language
+        changeLanguage(arg);
+      });
+
+      // total
+      window.api.on('total', arg => {
+        // place exists
+        if (arg.place) {
+          // place
+          racePlaceDom.innerHTML = arg.place;
+        }
+        // successtotal
+        successtotalDom.innerHTML = arg.len;
+        // failtotal
+        failtotalDom.innerHTML = arg.len;
+      });
+
+      // file
+      window.api.on("file", arg => {
+        // set globally
+        globalfileList = arg;
+        // init selectbox
+        if (selectBoxDom.hasChildNodes()) {
+          while (selectBoxDom.childNodes.length > 0) {
+            selectBoxDom.removeChild(selectBoxDom.firstChild)
+          }
+        }
+        // set options
+        for (i = 0; i < arg.file.length; i++) {
+          // option elem
+          const option = document.createElement("option");
+          // set value
+          option.value = i + 1;
+          // set text
+          option.text = arg.file[i].substring(0, 30) + " " + arg.date[i];
+          // appned options
+          selectBoxDom.appendChild(option);
+        }
+        // show modal
+        modalDialogDom.showModal();
+        // avoid scrolling
+        document.documentElement.style.overflow = "hidden";
+      });
+
+      // ok modal
+      okButtonDom.addEventListener('click', (e) => {
+        e.preventDefault();
+        // close modal
+        modalDialogDom.close();
+        // clear style
+        document.documentElement.removeAttribute("style");
+        // get selected index
+        const selected = selectBoxDom.selectedIndex;
+        // send index
+        window.api.send("sire", globalfileList[selected - 1]);
+      });
+
+      // close modal
+      ngButtonDom.addEventListener('click', (e) => {
+        e.preventDefault();
+        // close modal
+        modalDialogDom.close();
+        // clear style
+        document.documentElement.removeAttribute("style");
+      });
+
+      // update status
+      window.api.on('statusUpdate', arg => {
+        try {
+          // status 
+          statusDom.innerHTML = arg.status;
+          // target
+          pageDom.innerHTML = arg.target;
+
+        } catch (e) {
+          // error
+          console.log(e);
+        }
+      });
+
+      // success
+      window.api.on('success', arg => {
+        // success dom
+        successDom.innerHTML = arg;
+      });
+
+      // fail
+      window.api.on('fail', arg => {
+        // fail dom
+        failDom.innerHTML = arg;
+      });
+
+      // crops data
+      const getCropResults = () => {
+        try {
+          // send crops result
+          window.api.send("sire");
+
+        } catch (e) {
+          // error
+          window.api.send("error", e);
+        }
+      }
+
+      // training
+      const getTrainings = () => {
+        try {
+          console.log(dateDom.value);
+          if (dateDom.value != '') {
+            // get selected
+            const value = document.querySelector("input[name='mode']:checked").value;
+            // send training result
+            window.api.send("training", value);
+          } else {
+            // japanese
+            if (japaneseFlg) {
+              // error
+              window.api.send("error", '日付が設定されていません');
+            } else {
+              // error
+              window.api.send("error", 'date is empty');
+            }
+          }
+
+        } catch (e) {
+          // error
+          window.api.send("error", e);
+        }
+      }
+
+      // config
+      const configPage = () => {
+        try {
+          // config 
+          window.api.send("config", japaneseFlg);
+
+        } catch (e) {
+          // error
+          window.api.send("error", e);
+        }
+      }
+
+      // exit
+      const exitPage = () => {
+        try {
+          // exit app
+          window.api.send("exitapp");
+
+        } catch (e) {
+          // error
+          window.api.send("error", e);
+        }
+      }
+
+      // change language
+      const changeLanguage = lang => {
+        // japanese
+        if (lang == 'japanese') {
+          japaneseFlg = true;
+          document.title = APPNAME_STR_JA;
+          maintitleDom.innerHTML = APPNAME_STR_JA;
+          getcropsDom.innerHTML = GETCROPS_STR_JA;
+          getcropsButtonDom.innerHTML = GETCROPS_STR_JA;
+          gettrainingDom.innerHTML = GETTRAINING_STR_JA;
+          gettrainingButtonDom.innerHTML = GETTRAINING_STR_JA;
+          allDom.innerHTML = ALL_STR_JA;
+          eastDom.innerHTML = EAST_STR_JA;
+          westDom.innerHTML = WEST_STR_JA;
+          localDom.innerHTML = LOCAL_STR_JA;
+          getconfigButtonDom.innerHTML = CONFIG_STR_JA;
+          exitDom.innerHTML = EXIT_STR_JA;
+          successHeadDom.innerHTML = SUCCESS_STR_JA;
+          failHeadDom.innerHTML = FAIL_STR_JA;
+          racingdateDom.innerHTML = DATE_STR_JA;
+          dialogTitleDom.innerHTML = SELECTCSV_STR_JA;
+          document.documentElement.setAttribute("lang", 'ja');
+          // english
+        } else {
+          japaneseFlg = false;
+          document.title = APPNAME_STR_EN;
+          maintitleDom.innerHTML = APPNAME_STR_EN;
+          getcropsDom.innerHTML = GETCROPS_STR_EN;
+          getcropsButtonDom.innerHTML = GETCROPS_STR_EN;
+          gettrainingDom.innerHTML = GETTRAINING_STR_EN;
+          gettrainingButtonDom.innerHTML = GETTRAINING_STR_EN;
+          allDom.innerHTML = ALL_STR_EN;
+          eastDom.innerHTML = EAST_STR_EN;
+          westDom.innerHTML = WEST_STR_EN;
+          localDom.innerHTML = LOCAL_STR_EN;
+          getconfigButtonDom.innerHTML = CONFIG_STR_EN;
+          exitDom.innerHTML = EXIT_STR_EN;
+          successHeadDom.innerHTML = SUCCESS_STR_EN;
+          failHeadDom.innerHTML = FAIL_STR_EN;
+          racingdateDom.innerHTML = DATE_STR_EN;
+          dialogTitleDom.innerHTML = SELECTCSV_STR_EN;
+          document.documentElement.setAttribute("lang", 'en');
+        }
+      }
+    </script>
+</body>
+
+</html>
