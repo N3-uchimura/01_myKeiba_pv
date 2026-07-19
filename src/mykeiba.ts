@@ -16,7 +16,7 @@ import { readFile, writeFile } from 'node:fs/promises'; // filesystem
 import axios from 'axios'; // http
 import { BrowserWindow, app, ipcMain, Tray, Menu, nativeImage } from 'electron'; // electron
 import { config as dotenv } from 'dotenv'; // dotenv
-import { Scrape } from './class/ElScrapeCore0810'; // custom Scraper
+import { Scrape } from './class/ElScrape0804'; // custom Scraper
 import ELLogger from './class/ElLogger'; // logger
 import Dialog from './class/ElDialog0721'; // dialog
 import CSV from './class/ElCsv0414'; // aggregator
@@ -96,7 +96,7 @@ const createWindow = (): void => {
       // not packaged
       if (!app.isPackaged) {
         // dev mode
-        mainWindow.webContents.openDevTools();
+        //mainWindow.webContents.openDevTools();
       }
     });
 
@@ -313,8 +313,10 @@ ipcMain.on('sire', async (event: any, arg: any) => {
     const selectorArray: string[] = [mySelectors.TURF_SELECTOR, mySelectors.TURF_WIN_SELECTOR, mySelectors.DIRT_SELECTOR, mySelectors.DIRT_WIN_SELECTOR, mySelectors.TURF_DIST_SELECTOR, mySelectors.DIRT_DIST_SELECTOR];
     // language
     const language = cacheMaker.get('language') ?? '';
+    logger.silly(`${myConst.DEFAULT_URL}/horse/getstallion`);
     // stallion data
     const stallionData: any = await httpsPost(`${myConst.DEFAULT_URL}/horse/getstallion`, {});
+    logger.silly(stallionData);
     // extract first column
     const horses: string[] = stallionData.map((item: any) => item.horsename);
     // extract second column
@@ -548,7 +550,7 @@ ipcMain.on('training', async (event: any, arg: any) => {
     // for race loop
     const racenums: number[] = [...Array(12)].map((_, i) => i + 1);
     // loop each races
-    for await (const [idx, _] of Object.entries(raceNoArray)) {
+    for (const [idx, _] of Object.entries(raceNoArray)) {
       let targetIdx: number;
       // course name
       let targetCourseName: string;
@@ -587,10 +589,12 @@ ipcMain.on('training', async (event: any, arg: any) => {
       });
 
       // loop each races
-      for await (let j of racenums) {
+      for (const j of racenums) {
         try {
-          // tmpJsonArray
+          // tmp JsonArray
           let tmpJsonArray: any[] = [];
+          // post Array
+          let postArray: any[] = [];
           // url
           const targetUrl: string = `${baseUrl}${String(j).padStart(2, '0')}${myUrls.DEF_URL_QUERY}`;
           // goto site
@@ -600,8 +604,10 @@ ipcMain.on('training', async (event: any, arg: any) => {
           await scraper.doWaitFor(3000);
           // for loop
           const horsenums: number[] = [...Array(18)].map((_, i) => i + 1);
+          // elements
+          const elementCount = await scraper.doGetLength('.OikiriDataHead1');
           // loop each horses
-          for await (let i of horsenums) {
+          for (const i of horsenums) {
             try {
               // switch on language
               if (language == 'japanese') {
@@ -641,27 +647,58 @@ ipcMain.on('training', async (event: any, arg: any) => {
               if (!await scraper.doCheckSelector(`.OikiriDataHead${i} .Horse_Info .Horse_Name a`)) {
                 break;
               }
-              const postArray: any = await Promise.all([
-                // race no
-                String(j),
-                // horse name
-                scraper.doSingleEval(`.OikiriDataHead${i} .Horse_Info .Horse_Name a`, 'innerHTML'),
-                // date
-                scraper.doSingleEval(`.OikiriDataHead${i} .Training_Day`, 'innerHTML'),
-                // place
-                scraper.doSingleEval(`.OikiriDataHead${i} td:nth-child(6)`, 'innerHTML'),
-                // condition
-                scraper.doSingleEval(`.OikiriDataHead${i} td:nth-child(7)`, 'innerHTML'),
-                // training strength
-                scraper.doSingleEval(`.OikiriDataHead${i} .TrainingLoad`, 'innerHTML'),
-                // training review
-                scraper.doSingleEval(`.OikiriDataHead${i} .Training_Critic`, 'innerHTML'),
-                // rap time
-                scraper.doMultiEval(`.OikiriDataHead${i} .TrainingTimeData .TrainingTimeDataList li .RapTime`, 'innerHTML'),
-                // cell color
-                scraper.doMultiEval(`.OikiriDataHead${i} .TrainingTimeData .TrainingTimeDataList li`, 'className'),
-              ]);
 
+              // if multiple
+              if (elementCount > 1) {
+                logger.debug("multiple mode");
+                // no
+                const tmpNo: number = i * 2 + 1;
+                // get data
+                postArray = await Promise.all([
+                  // race no
+                  String(j),
+                  // horse name
+                  scraper.doSingleEval(`.OikiriDataHead${i} .Horse_Info .Horse_Name a`, 'innerHTML'),
+                  // date
+                  scraper.doSingleEval(`.OikiriDataHead1:nth-child(${tmpNo}) .Training_Day`, 'innerHTML'),
+                  // place
+                  scraper.doSingleEval(`.OikiriDataHead1:nth-child(${tmpNo}) td:nth-child(6)`, 'innerHTML'),
+                  // condition
+                  scraper.doSingleEval(`.OikiriDataHead1:nth-child(${tmpNo}) td:nth-child(7)`, 'innerHTML'),
+                  // training strength
+                  scraper.doSingleEval(`.OikiriDataHead1:nth-child(${tmpNo}) .TrainingLoad`, 'innerHTML'),
+                  // training review
+                  scraper.doSingleEval(`.OikiriDataHead1:nth-child(${tmpNo}) .Training_Critic`, 'innerHTML'),
+                  // rap time
+                  scraper.doMultiEval(`.OikiriDataHead1:nth-child(${tmpNo}) .TrainingTimeData .TrainingTimeDataList li .RapTime`, 'innerHTML'),
+                  // cell color
+                  scraper.doMultiEval(`.OikiriDataHead1:nth-child(${tmpNo}) .TrainingTimeData .TrainingTimeDataList li`, 'className'),
+                ]);
+
+              } else {
+                logger.debug("single mode");
+                // get data
+                postArray = await Promise.all([
+                  // race no
+                  String(j),
+                  // horse name
+                  scraper.doSingleEval(`.OikiriDataHead${i} .Horse_Info .Horse_Name a`, 'innerHTML'),
+                  // date
+                  scraper.doSingleEval(`.OikiriDataHead${i} .Training_Day`, 'innerHTML'),
+                  // place
+                  scraper.doSingleEval(`.OikiriDataHead${i} td:nth-child(6)`, 'innerHTML'),
+                  // condition
+                  scraper.doSingleEval(`.OikiriDataHead${i} td:nth-child(7)`, 'innerHTML'),
+                  // training strength
+                  scraper.doSingleEval(`.OikiriDataHead${i} .TrainingLoad`, 'innerHTML'),
+                  // training review
+                  scraper.doSingleEval(`.OikiriDataHead${i} .Training_Critic`, 'innerHTML'),
+                  // rap time
+                  scraper.doMultiEval(`.OikiriDataHead${i} .TrainingTimeData .TrainingTimeDataList li .RapTime`, 'innerHTML'),
+                  // cell color
+                  scraper.doMultiEval(`.OikiriDataHead${i} .TrainingTimeData .TrainingTimeDataList li`, 'className'),
+                ]);
+              }
               // not empty
               if (postArray.length > 0) {
                 // set each value

@@ -1,6 +1,7 @@
 /node_modules/
 .env
 .manenv
+/.vscode/
 package-lock.json
 /output/
 /build/

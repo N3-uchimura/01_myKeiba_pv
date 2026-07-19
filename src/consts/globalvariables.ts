@@ -13,7 +13,7 @@ export namespace myConst {
   export const LOG_LEVEL: string = "all";
   export const DEFAULT_ENCODING: string = "utf8";
   export const CSV_ENCODING: string = "SJIS";
-  export const DEFAULT_URL: string = "https://keiba.numthree.net";
+  export const DEFAULT_URL: string = "https://keiba.numthree.net/api";
   export const FINISHED_MESSAGE_JA: string = '完了しました。デスクトップにCSVファイルを出力しました。';
   export const FINISHED_MESSAGE_EN: string = 'completed. csv file is on desktop.';
   export const WINDOW_WIDTH: number = 600; // window width
