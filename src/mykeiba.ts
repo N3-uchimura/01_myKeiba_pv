@@ -452,7 +452,7 @@ ipcMain.on('date', async (_: any, arg: any) => {
 });
 
 // get horse training
-ipcMain.on('training', async (event: any, arg: any) => {
+ipcMain.on('training', async (event: any, _: any) => {
   try {
     logger.info('ipc: gettraining mode');
     // success Counter
@@ -471,12 +471,10 @@ ipcMain.on('training', async (event: any, arg: any) => {
     const language = cacheMaker.get('language') ?? 'japanese';
     // get date
     const date: string = cacheMaker.get('date') ?? getNowDate();
-    // race place
-    const racePlaceData: any = await httpsPost('https://keiba.numthree.net/api/race/getracingplace', { date: date });
     // race no
-    const raceNoData: any = await httpsPost('https://keiba.numthree.net/api/race/getracingno', { date: date });
+    const raceNoData: any = await httpsPost('https://keiba.numthree.net/api/race/getracing', { date: date });
     // empty
-    if (raceNoData.length == 0) {
+    if (raceNoData.no.length == 0) {
       // error message
       let racingErrorMsg: string;
       // get language
@@ -513,44 +511,10 @@ ipcMain.on('training', async (event: any, arg: any) => {
     // wait 3 sec
     await scraper.doWaitFor(3000);
 
-    // mode switch
-    switch (arg) {
-      // all mode
-      case "all":
-        // all
-        targetId = 999;
-        raceNoArray = raceNoData;
-        break;
-
-      // east mode
-      case "east":
-        // title scrape
-        targetId = 0;
-        raceNoArray = [raceNoData[0]];
-        break;
-
-      // west mode
-      case "west":
-        // author scrape
-        targetId = 1;
-        raceNoArray = [raceNoData[1]];
-        break;
-
-      // local mode
-      case "local":
-        // author scrape
-        targetId = 2;
-        raceNoArray = [raceNoData[2]];
-        break;
-
-      default:
-        console.log('invalid mode');
-    }
-
     // for race loop
     const racenums: number[] = [...Array(12)].map((_, i) => i + 1);
     // loop each races
-    for (const [idx, _] of Object.entries(raceNoArray)) {
+    for (const [idx, _] of Object.entries(raceNoData.no)) {
       let targetIdx: number;
       // course name
       let targetCourseName: string;
@@ -560,25 +524,20 @@ ipcMain.on('training', async (event: any, arg: any) => {
       successCounter = 0;
       // initialize fail counter
       failCounter = 0;
-      if (targetId == 999) {
-        // index
-        targetIdx = Number(idx);
-      } else {
-        // index
-        targetIdx = targetId;
-      }
+      // index
+      targetIdx = Number(idx);
       // get language
       const localLanguage = cacheMaker.get('language') ?? 'japanese';
       // switch language
       if (localLanguage == 'japanese') {
         // set japanese racing cource
-        targetCourseName = racePlaceData[targetIdx];
+        targetCourseName = raceNoData.place[targetIdx];
       } else {
         // set english racing cource
-        targetCourseName = myRaces.RACES[racePlaceData[targetIdx]];
+        targetCourseName = myRaces.RACES[raceNoData.place[targetIdx]];
       }
       // raceid
-      const targetRaceId: string = raceNoData[targetIdx];
+      const targetRaceId: string = raceNoData.no[targetIdx];
       // base url
       const baseUrl: string = `${myUrls.TRAINING_BASE_URL}?race_id=${targetRaceId}`;
 

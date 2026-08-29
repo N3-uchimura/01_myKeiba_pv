@@ -24,12 +24,6 @@
         <h3 id="gettraining">Get Trainings</h3>
         <span id="racingdate">Racing Date</span><br>
         <input type="text" id="flatpickr"><br><br>
-        <div id="selectarea">
-          <input type="radio" name="mode" value="all" checked><label id="all" for="all">All</label>
-          <input type="radio" name="mode" value="east"><label id="east" for="east">EAST</label>
-          <input type="radio" name="mode" value="west"><label id="west" for="west">WEST</label>
-          <input type="radio" name="mode" value="local"><label id="local" for="local">LOCAL</label>
-        </div>
         <button id="gettraining_button" class="button-g button-wide" value="trainings" onclick="getTrainings();">Get
           Trainings</button>
       </div>
@@ -74,10 +68,6 @@
       const DATE_STR_JA = '開催日';
       const GETCROPS_STR_JA = '産駒成績取得';
       const GETTRAINING_STR_JA = '調教取得';
-      const ALL_STR_JA = '全';
-      const EAST_STR_JA = '関東';
-      const WEST_STR_JA = '関西';
-      const LOCAL_STR_JA = 'ローカル';
       const CONFIG_STR_JA = '設定';
       const SUCCESS_STR_JA = '成功:';
       const FAIL_STR_JA = '失敗:';
@@ -88,10 +78,6 @@
       const DATE_STR_EN = 'Racing Date';
       const GETCROPS_STR_EN = 'Get Crop Results';
       const GETTRAINING_STR_EN = 'Get Trainings';
-      const ALL_STR_EN = 'ALL';
-      const EAST_STR_EN = 'EAST';
-      const WEST_STR_EN = 'WEST';
-      const LOCAL_STR_EN = 'LOCAL';
       const CONFIG_STR_EN = 'Config';
       const SUCCESS_STR_EN = 'success:';
       const FAIL_STR_EN = 'fail:';
@@ -101,10 +87,6 @@
       const pageDom = document.getElementById('targetpage');
       const statusDom = document.getElementById('status');
       const maintitleDom = document.getElementById("maintitle");
-      const allDom = document.getElementById('all');
-      const eastDom = document.getElementById('east');
-      const westDom = document.getElementById('west');
-      const localDom = document.getElementById('local');
       const getcropsDom = document.getElementById("getcrops");
       const getcropsButtonDom = document.getElementById("getcrops_button");
       const gettrainingDom = document.getElementById("gettraining");
@@ -252,10 +234,8 @@
         try {
           console.log(dateDom.value);
           if (dateDom.value != '') {
-            // get selected
-            const value = document.querySelector("input[name='mode']:checked").value;
             // send training result
-            window.api.send("training", value);
+            window.api.send("training");
           } else {
             // japanese
             if (japaneseFlg) {
@@ -308,10 +288,6 @@
           getcropsButtonDom.innerHTML = GETCROPS_STR_JA;
           gettrainingDom.innerHTML = GETTRAINING_STR_JA;
           gettrainingButtonDom.innerHTML = GETTRAINING_STR_JA;
-          allDom.innerHTML = ALL_STR_JA;
-          eastDom.innerHTML = EAST_STR_JA;
-          westDom.innerHTML = WEST_STR_JA;
-          localDom.innerHTML = LOCAL_STR_JA;
           getconfigButtonDom.innerHTML = CONFIG_STR_JA;
           exitDom.innerHTML = EXIT_STR_JA;
           successHeadDom.innerHTML = SUCCESS_STR_JA;
@@ -328,10 +304,6 @@
           getcropsButtonDom.innerHTML = GETCROPS_STR_EN;
           gettrainingDom.innerHTML = GETTRAINING_STR_EN;
           gettrainingButtonDom.innerHTML = GETTRAINING_STR_EN;
-          allDom.innerHTML = ALL_STR_EN;
-          eastDom.innerHTML = EAST_STR_EN;
-          westDom.innerHTML = WEST_STR_EN;
-          localDom.innerHTML = LOCAL_STR_EN;
           getconfigButtonDom.innerHTML = CONFIG_STR_EN;
           exitDom.innerHTML = EXIT_STR_EN;
           successHeadDom.innerHTML = SUCCESS_STR_EN;
