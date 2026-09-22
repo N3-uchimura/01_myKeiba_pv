@@ -10,14 +10,25 @@ export namespace myConst {
   export const DEVMODE: boolean = true;
   export const COMPANY_NAME: string = "nthree";
   export const APP_NAME: string = "myKeiba";
-  export const LOG_LEVEL: string = "all";
+  export const LOG_LEVEL: string = "debug";
+  export const ENV_PATH: string = '.env';
   export const DEFAULT_ENCODING: string = "utf8";
   export const CSV_ENCODING: string = "SJIS";
-  export const DEFAULT_URL: string = "https://keiba.numthree.net/api";
+  export const DEFAULT_URL: string = "https://keiba.numthree.net";
+  export const QUESTION_MESSAGE_JA: string = '停止していいですか。デスクトップにCSVが保存されます。';
+  export const QUESTION_MESSAGE_EN: string = 'app will stop ok？scraped csv is written to desktop.';
   export const FINISHED_MESSAGE_JA: string = '完了しました。デスクトップにCSVファイルを出力しました。';
   export const FINISHED_MESSAGE_EN: string = 'completed. csv file is on desktop.';
-  export const WINDOW_WIDTH: number = 600; // window width
-  export const WINDOW_HEIGHT: number = 1000; // window height
+  export const WINDOW_WIDTH: number = 600;
+  export const WINDOW_HEIGHT: number = 1000;
+}
+
+// development
+export namespace myDevConst {
+  export const DEV_APP_NAME: string = 'myKeibadev';
+  export const DEV_LOG_LEVEL: string = 'all';
+  export const DEV_ENV_PATH: string = '.devenv';
+  export const DEV_DEFAULT_URL: string = 'https://dev.numthree.net';
 }
 
 // urls

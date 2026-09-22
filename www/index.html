@@ -21,6 +21,10 @@
           Results</button>
       </div>
       <div class="operation_area">
+        <button id="pause_button" class="button-g button-6 button-wide" value="pause"
+          onclick="pauseScrape();">Pause</button>
+      </div>
+      <div class="operation_area">
         <h3 id="gettraining">Get Trainings</h3>
         <span id="racingdate">Racing Date</span><br>
         <input type="text" id="flatpickr"><br><br>
@@ -67,6 +71,7 @@
       const APPNAME_STR_JA = '競馬スクレイピングツール';
       const DATE_STR_JA = '開催日';
       const GETCROPS_STR_JA = '産駒成績取得';
+      const PAUSE_STR_JA = '停止';
       const GETTRAINING_STR_JA = '調教取得';
       const CONFIG_STR_JA = '設定';
       const SUCCESS_STR_JA = '成功:';
@@ -77,6 +82,7 @@
       const APPNAME_STR_EN = 'Data HorseData Scraper';
       const DATE_STR_EN = 'Racing Date';
       const GETCROPS_STR_EN = 'Get Crop Results';
+      const PAUSE_STR_EN = 'Pause';
       const GETTRAINING_STR_EN = 'Get Trainings';
       const CONFIG_STR_EN = 'Config';
       const SUCCESS_STR_EN = 'success:';
@@ -89,6 +95,7 @@
       const maintitleDom = document.getElementById("maintitle");
       const getcropsDom = document.getElementById("getcrops");
       const getcropsButtonDom = document.getElementById("getcrops_button");
+      const pauseButtonDom = document.getElementById("pause_button");
       const gettrainingDom = document.getElementById("gettraining");
       const gettrainingButtonDom = document.getElementById("gettraining_button");
       const getconfigButtonDom = document.getElementById("config_button");
@@ -253,6 +260,18 @@
         }
       }
 
+      // pause scraping
+      const pauseScrape = () => {
+        try {
+          // pause scraping
+          window.api.send("pause", '');
+
+        } catch (e) {
+          // error
+          console.log(e);
+        }
+      }
+
       // config
       const configPage = () => {
         try {
@@ -286,6 +305,7 @@
           maintitleDom.innerHTML = APPNAME_STR_JA;
           getcropsDom.innerHTML = GETCROPS_STR_JA;
           getcropsButtonDom.innerHTML = GETCROPS_STR_JA;
+          pauseButtonDom.innerHTML = PAUSE_STR_JA;
           gettrainingDom.innerHTML = GETTRAINING_STR_JA;
           gettrainingButtonDom.innerHTML = GETTRAINING_STR_JA;
           getconfigButtonDom.innerHTML = CONFIG_STR_JA;
@@ -302,6 +322,7 @@
           maintitleDom.innerHTML = APPNAME_STR_EN;
           getcropsDom.innerHTML = GETCROPS_STR_EN;
           getcropsButtonDom.innerHTML = GETCROPS_STR_EN;
+          pauseButtonDom.innerHTML = PAUSE_STR_EN;
           gettrainingDom.innerHTML = GETTRAINING_STR_EN;
           gettrainingButtonDom.innerHTML = GETTRAINING_STR_EN;
           getconfigButtonDom.innerHTML = CONFIG_STR_EN;

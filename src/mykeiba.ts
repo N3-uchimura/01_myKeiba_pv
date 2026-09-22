@@ -8,7 +8,22 @@
 
 /// Constants
 // name space
-import { myConst, myUrls, mySelectors, myRaces } from './consts/globalvariables';
+import { myConst, myDevConst, myUrls, mySelectors, myRaces } from './consts/globalvariables';
+
+/// Variables
+let globalAppName: string = '';
+let globalLogLevel: string = '';
+let globalDefaultUrl: string = '';
+// devmode
+if (myConst.DEVMODE) {
+  globalAppName = myDevConst.DEV_APP_NAME;
+  globalLogLevel = myDevConst.DEV_LOG_LEVEL;
+  globalDefaultUrl = myDevConst.DEV_DEFAULT_URL;
+} else {
+  globalAppName = myConst.APP_NAME;
+  globalLogLevel = myConst.LOG_LEVEL;
+  globalDefaultUrl = myConst.DEFAULT_URL;
+}
 
 /// Modules
 import * as path from 'node:path'; // path
@@ -23,7 +38,6 @@ import CSV from './class/ElCsv0414'; // aggregator
 import NodeCache from 'node-cache'; // node-cache
 /// Variables
 let globalRootPath: string; // root path
-
 // production
 if (!myConst.DEVMODE) {
   globalRootPath = path.join(path.resolve(), 'resources')
@@ -37,10 +51,8 @@ dotenv({ path: path.join(globalRootPath, 'assets', '.env') });
 const dir_home =
   process.env[process.platform == 'win32' ? 'USERPROFILE' : 'HOME'] ?? '';
 const dir_desktop = path.join(dir_home, 'Desktop');
-// log level
-const logLevel: string = myConst.LOG_LEVEL ?? 'all';
 // loggeer instance
-const logger: ELLogger = new ELLogger(myConst.COMPANY_NAME, myConst.APP_NAME, logLevel);
+const logger: ELLogger = new ELLogger(myConst.COMPANY_NAME, globalAppName, globalLogLevel);
 // scraper
 const scraper = new Scrape(logger);
 // aggregator
@@ -70,6 +82,8 @@ interface windowOption {
 let mainWindow: any = null;
 // quit flg
 let isQuiting: boolean;
+// result array
+let globalResultArray: any[] = [];
 
 // make window
 const createWindow = (): void => {
@@ -277,6 +291,54 @@ ipcMain.on('top', async (_, __: any) => {
   mainWindow.send('topready', language);
 });
 
+// pause
+ipcMain.on("pause", async () => {
+  try {
+    logger.info("ipc: pause mode");
+    // question
+    let questionHeader: string = '';
+    // question
+    let questionMessage: string = '';
+    // language
+    const language = cacheMaker.get('language') ?? '';
+    // switch on language
+    if (language == 'japanese') {
+      // set finish message
+      questionHeader = '停止';
+      questionMessage = myConst.QUESTION_MESSAGE_JA;
+    } else {
+      // set finish message
+      questionHeader = 'stop';
+      questionMessage = myConst.QUESTION_MESSAGE_EN;
+    }
+    // show question dialog
+    const selected: number = dialogMaker.showQuetion('Q', questionHeader, questionMessage);
+    // yes
+    if (selected == 0) {
+      // today date
+      const formattedDate: string = 'sire_' + getNowDate();
+      // file path
+      const filePath: string = path.join(dir_desktop, formattedDate + '.csv');
+      // write to CSV
+      await csvMaker.makeCsvData(globalResultArray, myRaces.HORSE_CSV_COLUMNS, filePath);
+      // pause message
+      dialogMaker.showmessage("info", "stopped.");
+      // close
+      app.quit();
+
+    } else {
+      return false;
+    }
+
+  } catch (e: unknown) {
+    // error
+    if (e instanceof Error) {
+      // error
+      logger.error(e.message);
+    }
+  }
+});
+
 // exit
 ipcMain.on('exitapp', async (_, __) => {
   logger.info('app: exit app');
@@ -307,18 +369,17 @@ ipcMain.on('sire', async (event: any, arg: any) => {
     let statusmessage: string;
     // finish message
     let endmessage: string;
-    // result array
-    let resultArray: any[] = [];
+
     // selector array
     const selectorArray: string[] = [mySelectors.TURF_SELECTOR, mySelectors.TURF_WIN_SELECTOR, mySelectors.DIRT_SELECTOR, mySelectors.DIRT_WIN_SELECTOR, mySelectors.TURF_DIST_SELECTOR, mySelectors.DIRT_DIST_SELECTOR];
     // language
     const language = cacheMaker.get('language') ?? '';
-    logger.silly(`${myConst.DEFAULT_URL}/horse/getstallion`);
+    logger.silly(`${globalDefaultUrl}/horse/getstallion`);
     // stallion data
-    const stallionData: any = await httpsPost(`${myConst.DEFAULT_URL}/horse/getstallion`, {});
+    const stallionData: any = await httpsPost(`${globalDefaultUrl}/horse/getstallion`, {});
     logger.silly(stallionData);
     // extract first column
-    const horses: string[] = stallionData.map((item: any) => item.horsename);
+    const stallions: string[] = stallionData.map((item: any) => item.stallionname);
     // extract second column
     const urls: string[] = stallionData.map((item: any) => item.url);
     // initialize
@@ -341,14 +402,14 @@ ipcMain.on('sire', async (event: any, arg: any) => {
         // url
         const sireUrl: string = myUrls.SIRE_BASE_URL + urls[i];
         // insert horse name
-        tmpObj.horse = horses[i];
+        tmpObj.horse = stallions[i];
         // goto page
         await scraper.doGo(sireUrl);
         // wait for selector
         await scraper.doWaitFor(3000);
         logger.debug(`sire: goto ${sireUrl}`);
         // send totalWords
-        event.sender.send('total', { len: urls.length, place: horses[i] });
+        event.sender.send('total', { len: urls.length, place: stallions[i] });
         // switch on language
         if (language == 'japanese') {
           // set finish message
@@ -389,7 +450,7 @@ ipcMain.on('sire', async (event: any, arg: any) => {
           }
         }
         // add to result array
-        resultArray.push(tmpObj);
+        globalResultArray.push(tmpObj);
         // increment success
         successCounter++;
 
@@ -411,7 +472,7 @@ ipcMain.on('sire', async (event: any, arg: any) => {
     // file path
     const filePath: string = path.join(dir_desktop, formattedDate + '.csv');
     // make csv
-    await csvMaker.makeCsvData(resultArray, myRaces.HORSE_CSV_COLUMNS, filePath);
+    await csvMaker.makeCsvData(globalResultArray, myRaces.HORSE_CSV_COLUMNS, filePath);
     // switch on language
     if (language == 'japanese') {
       // set finish message
@@ -472,7 +533,7 @@ ipcMain.on('training', async (event: any, _: any) => {
     // get date
     const date: string = cacheMaker.get('date') ?? getNowDate();
     // race no
-    const raceNoData: any = await httpsPost('https://keiba.numthree.net/api/race/getracing', { date: date });
+    const raceNoData: any = await httpsPost(`${globalDefaultUrl}/race/getracing`, { date: date });
     // empty
     if (raceNoData.no.length == 0) {
       // error message

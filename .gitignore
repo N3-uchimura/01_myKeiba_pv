@@ -1,13 +1,9 @@
 /node_modules/
-.env
-.manenv
 /.vscode/
-package-lock.json
 /output/
 /build/
 /csv/
-man.env
-appx_setting.json
 /dist/
-man.env
 /assets/.env
+/assets/.devenv
+package-lock.json
