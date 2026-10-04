@@ -13,16 +13,13 @@ import { myConst, myDevConst, myUrls, mySelectors, myRaces } from './consts/glob
 /// Variables
 let globalAppName: string = '';
 let globalLogLevel: string = '';
-let globalDefaultUrl: string = '';
 // devmode
 if (myConst.DEVMODE) {
   globalAppName = myDevConst.DEV_APP_NAME;
   globalLogLevel = myDevConst.DEV_LOG_LEVEL;
-  globalDefaultUrl = myDevConst.DEV_DEFAULT_URL;
 } else {
   globalAppName = myConst.APP_NAME;
   globalLogLevel = myConst.LOG_LEVEL;
-  globalDefaultUrl = myConst.DEFAULT_URL;
 }
 
 /// Modules
@@ -31,9 +28,9 @@ import { readFile, writeFile } from 'node:fs/promises'; // filesystem
 import axios from 'axios'; // http
 import { BrowserWindow, app, ipcMain, Tray, Menu, nativeImage } from 'electron'; // electron
 import { config as dotenv } from 'dotenv'; // dotenv
-import { Scrape } from './class/ElScrape0804'; // custom Scraper
+import { Scrape } from './class/ElScrapeCore1003'; // custom Scraper
 import ELLogger from './class/ElLogger'; // logger
-import Dialog from './class/ElDialog0721'; // dialog
+import Dialog from './class/ElDialog1124'; // dialog
 import CSV from './class/ElCsv0414'; // aggregator
 import NodeCache from 'node-cache'; // node-cache
 /// Variables
@@ -53,8 +50,8 @@ const dir_home =
 const dir_desktop = path.join(dir_home, 'Desktop');
 // loggeer instance
 const logger: ELLogger = new ELLogger(myConst.COMPANY_NAME, globalAppName, globalLogLevel);
-// scraper
-const scraper = new Scrape(logger);
+// scrapeMaker
+const scrapeMaker = new Scrape(logger);
 // aggregator
 const csvMaker = new CSV(myConst.CSV_ENCODING, logger);
 // dialog
@@ -374,16 +371,15 @@ ipcMain.on('sire', async (event: any, arg: any) => {
     const selectorArray: string[] = [mySelectors.TURF_SELECTOR, mySelectors.TURF_WIN_SELECTOR, mySelectors.DIRT_SELECTOR, mySelectors.DIRT_WIN_SELECTOR, mySelectors.TURF_DIST_SELECTOR, mySelectors.DIRT_DIST_SELECTOR];
     // language
     const language = cacheMaker.get('language') ?? '';
-    logger.silly(`${globalDefaultUrl}/horse/getstallion`);
     // stallion data
-    const stallionData: any = await httpsPost(`${globalDefaultUrl}/horse/getstallion`, {});
+    const stallionData: any = await httpsPost(`${myConst.DEFAULT_URL}/horse/getstallion`, {});
     logger.silly(stallionData);
     // extract first column
     const stallions: string[] = stallionData.map((item: any) => item.stallionname);
     // extract second column
     const urls: string[] = stallionData.map((item: any) => item.url);
     // initialize
-    await scraper.init();
+    await scrapeMaker.init();
     logger.debug('sire: initialize end');
 
     // loop words
@@ -404,9 +400,9 @@ ipcMain.on('sire', async (event: any, arg: any) => {
         // insert horse name
         tmpObj.horse = stallions[i];
         // goto page
-        await scraper.doGo(sireUrl);
+        await scrapeMaker.doGo(sireUrl);
         // wait for selector
-        await scraper.doWaitFor(3000);
+        await scrapeMaker.doWaitFor(3000);
         logger.debug(`sire: goto ${sireUrl}`);
         // send totalWords
         event.sender.send('total', { len: urls.length, place: stallions[i] });
@@ -428,18 +424,18 @@ ipcMain.on('sire', async (event: any, arg: any) => {
         for (let j: number = 0; j < selectorArray.length; j++) {
           try {
             // check selector
-            if (await scraper.doCheckSelector(selectorArray[j])) {
+            if (await scrapeMaker.doCheckSelector(selectorArray[j])) {
               // wait for selector
-              await scraper.doWaitFor(200);
+              await scrapeMaker.doWaitFor(200);
               // acquired data
-              const scrapedData: string = await scraper.doSingleEval(selectorArray[j], 'textContent');
+              const scrapedData: string = await scrapeMaker.doSingleEval(selectorArray[j], 'textContent');
 
               // data exists
               if (scrapedData != '') {
                 tmpObj[myRaces.HORSE_SCRAPE_COLUMNS[j]] = scrapedData;
               }
               // wait for 100ms
-              await scraper.doWaitFor(200);
+              await scrapeMaker.doWaitFor(200);
 
             } else {
               logger.debug('sire: no selector');
@@ -520,22 +516,18 @@ ipcMain.on('training', async (event: any, _: any) => {
     let successCounter: number = 0;
     // fail Counter
     let failCounter: number = 0;
-    // fail Counter
-    let targetId: number = 0;
     // status message
     let statusmessage: string;
     // finish message
     let endmessage: string;
-    // race no
-    let raceNoArray: any;
     // get language
     const language = cacheMaker.get('language') ?? 'japanese';
     // get date
     const date: string = cacheMaker.get('date') ?? getNowDate();
     // race no
-    const raceNoData: any = await httpsPost(`${globalDefaultUrl}/race/getracing`, { date: date });
+    const raceData: any = await httpsPost(`${myConst.DEFAULT_URL}/race/getracing`, { date: date });
     // empty
-    if (raceNoData.no.length == 0) {
+    if (raceData.no.length == 0) {
       // error message
       let racingErrorMsg: string;
       // get language
@@ -555,27 +547,27 @@ ipcMain.on('training', async (event: any, _: any) => {
     const trainingColumns: string[] = ['race', 'horse', 'date', 'place', 'condition', 'strength', 'review', 'lap1', 'lap2', 'lap3', 'lap4', 'lap5', 'color1', 'color2', 'color3', 'color4', 'color5'];
 
     // initialize
-    await scraper.init();
+    await scrapeMaker.init();
     // goto netkeiba
-    await scraper.doGo(myUrls.BASE_AUTH_URL);
+    await scrapeMaker.doGo(myUrls.BASE_AUTH_URL);
     logger.debug(`goto ${myUrls.BASE_AUTH_URL}`);
     // wait for id/pass input
-    await scraper.doWaitFor(3000);
+    await scrapeMaker.doWaitFor(3000);
     // input id
-    await scraper.doType("input[name='login_id']", NETKEIBA_ID);
+    await scrapeMaker.doType("input[name='login_id']", NETKEIBA_ID);
     // input pass
-    await scraper.doType("input[name='pswd']", NETKEIBA_PASS);
+    await scrapeMaker.doType("input[name='pswd']", NETKEIBA_PASS);
     // wait 3 sec
-    await scraper.doWaitFor(3000);
+    await scrapeMaker.doWaitFor(3000);
     // click login button
-    await scraper.doClick('.loginBtn__wrap input');
+    await scrapeMaker.doClick('.loginBtn__wrap input');
     // wait 3 sec
-    await scraper.doWaitFor(3000);
+    await scrapeMaker.doWaitFor(3000);
 
     // for race loop
     const racenums: number[] = [...Array(12)].map((_, i) => i + 1);
     // loop each races
-    for (const [idx, _] of Object.entries(raceNoData.no)) {
+    for (const [idx, _] of Object.entries(raceData.no)) {
       let targetIdx: number;
       // course name
       let targetCourseName: string;
@@ -592,13 +584,13 @@ ipcMain.on('training', async (event: any, _: any) => {
       // switch language
       if (localLanguage == 'japanese') {
         // set japanese racing cource
-        targetCourseName = raceNoData.place[targetIdx];
+        targetCourseName = raceData.place[targetIdx];
       } else {
         // set english racing cource
-        targetCourseName = myRaces.RACES[raceNoData.place[targetIdx]];
+        targetCourseName = myRaces.RACES[raceData.place[targetIdx]];
       }
       // raceid
-      const targetRaceId: string = raceNoData.no[targetIdx];
+      const targetRaceId: string = raceData.no[targetIdx];
       // base url
       const baseUrl: string = `${myUrls.TRAINING_BASE_URL}?race_id=${targetRaceId}`;
 
@@ -618,14 +610,14 @@ ipcMain.on('training', async (event: any, _: any) => {
           // url
           const targetUrl: string = `${baseUrl}${String(j).padStart(2, '0')}${myUrls.DEF_URL_QUERY}`;
           // goto site
-          await scraper.doGo(targetUrl);
+          await scrapeMaker.doGo(targetUrl);
           logger.debug(`scraping ${targetUrl}`);
           // wait for datalist
-          await scraper.doWaitFor(3000);
+          await scrapeMaker.doWaitFor(3000);
           // for loop
           const horsenums: number[] = [...Array(18)].map((_, i) => i + 1);
           // elements
-          const elementCount = await scraper.doGetLength('.OikiriDataHead1');
+          const elementCount = await scrapeMaker.doGetLength('.OikiriDataHead1');
           // loop each horses
           for (const i of horsenums) {
             try {
@@ -662,9 +654,9 @@ ipcMain.on('training', async (event: any, _: any) => {
                 color4: '', // training color
                 color5: '', // training color
               };
-              await scraper.doWaitFor(1000);
+              await scrapeMaker.doWaitFor(1000);
               // no element break
-              if (!await scraper.doCheckSelector(`.OikiriDataHead${i} .Horse_Info .Horse_Name a`)) {
+              if (!await scrapeMaker.doCheckSelector(`.OikiriDataHead${i} .Horse_Info .Horse_Name a`)) {
                 break;
               }
 
@@ -678,21 +670,21 @@ ipcMain.on('training', async (event: any, _: any) => {
                   // race no
                   String(j),
                   // horse name
-                  scraper.doSingleEval(`.OikiriDataHead${i} .Horse_Info .Horse_Name a`, 'innerHTML'),
+                  scrapeMaker.doSingleEval(`.OikiriDataHead${i} .Horse_Info .Horse_Name a`, 'innerHTML'),
                   // date
-                  scraper.doSingleEval(`.OikiriDataHead1:nth-child(${tmpNo}) .Training_Day`, 'innerHTML'),
+                  scrapeMaker.doSingleEval(`.OikiriDataHead1:nth-child(${tmpNo}) .Training_Day`, 'innerHTML'),
                   // place
-                  scraper.doSingleEval(`.OikiriDataHead1:nth-child(${tmpNo}) td:nth-child(6)`, 'innerHTML'),
+                  (await scrapeMaker.doSingleEval(`.OikiriDataHead1:nth-child(${tmpNo}) td:nth-child(6)`, 'innerHTML')).replace(/<\/?[^>]+>/gi, '').replace('一番時計', ''),
                   // condition
-                  scraper.doSingleEval(`.OikiriDataHead1:nth-child(${tmpNo}) td:nth-child(7)`, 'innerHTML'),
+                  scrapeMaker.doSingleEval(`.OikiriDataHead1:nth-child(${tmpNo}) td:nth-child(7)`, 'innerHTML'),
                   // training strength
-                  scraper.doSingleEval(`.OikiriDataHead1:nth-child(${tmpNo}) .TrainingLoad`, 'innerHTML'),
+                  scrapeMaker.doSingleEval(`.OikiriDataHead1:nth-child(${tmpNo}) .TrainingLoad`, 'innerHTML'),
                   // training review
-                  scraper.doSingleEval(`.OikiriDataHead1:nth-child(${tmpNo}) .Training_Critic`, 'innerHTML'),
+                  scrapeMaker.doSingleEval(`.OikiriDataHead1:nth-child(${tmpNo}) .Training_Critic`, 'innerHTML'),
                   // rap time
-                  scraper.doMultiEval(`.OikiriDataHead1:nth-child(${tmpNo}) .TrainingTimeData .TrainingTimeDataList li .RapTime`, 'innerHTML'),
+                  scrapeMaker.doMultiEval(`.OikiriDataHead1:nth-child(${tmpNo}) .TrainingTimeData .TrainingTimeDataList li .RapTime`, 'innerHTML'),
                   // cell color
-                  scraper.doMultiEval(`.OikiriDataHead1:nth-child(${tmpNo}) .TrainingTimeData .TrainingTimeDataList li`, 'className'),
+                  scrapeMaker.doMultiEval(`.OikiriDataHead1:nth-child(${tmpNo}) .TrainingTimeData .TrainingTimeDataList li`, 'className'),
                 ]);
 
               } else {
@@ -702,21 +694,21 @@ ipcMain.on('training', async (event: any, _: any) => {
                   // race no
                   String(j),
                   // horse name
-                  scraper.doSingleEval(`.OikiriDataHead${i} .Horse_Info .Horse_Name a`, 'innerHTML'),
+                  scrapeMaker.doSingleEval(`.OikiriDataHead${i} .Horse_Info .Horse_Name a`, 'innerHTML'),
                   // date
-                  scraper.doSingleEval(`.OikiriDataHead${i} .Training_Day`, 'innerHTML'),
+                  scrapeMaker.doSingleEval(`.OikiriDataHead${i} .Training_Day`, 'innerHTML'),
                   // place
-                  scraper.doSingleEval(`.OikiriDataHead${i} td:nth-child(6)`, 'innerHTML'),
+                  (await scrapeMaker.doSingleEval(`.OikiriDataHead${i} td:nth-child(6)`, 'innerHTML')).replace(/<\/?[^>]+>/gi, '').replace('一番時計', ''),
                   // condition
-                  scraper.doSingleEval(`.OikiriDataHead${i} td:nth-child(7)`, 'innerHTML'),
+                  scrapeMaker.doSingleEval(`.OikiriDataHead${i} td:nth-child(7)`, 'innerHTML'),
                   // training strength
-                  scraper.doSingleEval(`.OikiriDataHead${i} .TrainingLoad`, 'innerHTML'),
+                  scrapeMaker.doSingleEval(`.OikiriDataHead${i} .TrainingLoad`, 'innerHTML'),
                   // training review
-                  scraper.doSingleEval(`.OikiriDataHead${i} .Training_Critic`, 'innerHTML'),
+                  scrapeMaker.doSingleEval(`.OikiriDataHead${i} .Training_Critic`, 'innerHTML'),
                   // rap time
-                  scraper.doMultiEval(`.OikiriDataHead${i} .TrainingTimeData .TrainingTimeDataList li .RapTime`, 'innerHTML'),
+                  scrapeMaker.doMultiEval(`.OikiriDataHead${i} .TrainingTimeData .TrainingTimeDataList li .RapTime`, 'innerHTML'),
                   // cell color
-                  scraper.doMultiEval(`.OikiriDataHead${i} .TrainingTimeData .TrainingTimeDataList li`, 'className'),
+                  scrapeMaker.doMultiEval(`.OikiriDataHead${i} .TrainingTimeData .TrainingTimeDataList li`, 'className'),
                 ]);
               }
               // not empty
@@ -725,7 +717,7 @@ ipcMain.on('training', async (event: any, _: any) => {
                 tmpObj.race = postArray[0];
                 tmpObj.horse = postArray[1];
                 tmpObj.date = postArray[2];
-                tmpObj.place = postArray[3];
+                tmpObj.place = isNaN(postArray[3]) ? postArray[3] : '';
                 tmpObj.condition = postArray[4];
                 tmpObj.strength = postArray[5];
                 tmpObj.review = postArray[6];
@@ -779,7 +771,7 @@ ipcMain.on('training', async (event: any, _: any) => {
       // write data
       await csvMaker.makeCsvData(finalJsonArray.flat(), trainingColumns, filePath);
       logger.info(`csv completed.`);
-      await scraper.doWaitFor(1500);
+      await scrapeMaker.doWaitFor(1500);
     }
     // switch on language
     if (language == 'japanese') {

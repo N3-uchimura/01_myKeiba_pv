@@ -7,7 +7,7 @@
 /** const */
 // default
 export namespace myConst {
-  export const DEVMODE: boolean = true;
+  export const DEVMODE: boolean = false;
   export const COMPANY_NAME: string = "nthree";
   export const APP_NAME: string = "myKeiba";
   export const LOG_LEVEL: string = "debug";
@@ -28,7 +28,6 @@ export namespace myDevConst {
   export const DEV_APP_NAME: string = 'myKeibadev';
   export const DEV_LOG_LEVEL: string = 'all';
   export const DEV_ENV_PATH: string = '.devenv';
-  export const DEV_DEFAULT_URL: string = 'https://dev.numthree.net';
 }
 
 // urls

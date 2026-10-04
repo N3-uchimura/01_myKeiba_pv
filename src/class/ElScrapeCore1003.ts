@@ -1,30 +1,37 @@
 /**
- * ElScrape.ts
+ * ElScrapeCore.ts
  *
  * class：ElScrape
- * function：scraping site
- * updated: 2025/08/18
+ * function：scraping site with native chrome
+ * updated: 2026/10/03
  **/
 
 'use strict';
 
+// consts
+const USER_ROOT_PATH: string = process.env[process.platform == "win32" ? "USERPROFILE" : "HOME"] ?? ''; // user path
+const CHROME_EXEC_PATH1: string = 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'; // chrome.exe path1
+const CHROME_EXEC_PATH2: string = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'; // chrome.exe path2
+const CHROME_EXEC_PATH3: string = '\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe'; // chrome.exe path3
+const DISABLE_EXTENSIONS: string = '--disable-extensions'; // disable extension
+
 // define modules
+import * as path from "node:path"; // path
+import * as fs from "node:fs"; // fs
 import { setTimeout } from 'node:timers/promises'; // wait for seconds
-import puppeteer from 'puppeteer'; // Puppeteer for scraping
-import fetch from 'cross-fetch'; // required 'fetch'
-import { PuppeteerBlocker } from '@ghostery/adblocker-puppeteer';
+import puppeteer from 'puppeteer-core'; // Puppeteer for scraping
 
 //* Interfaces
 // puppeteer options
 interface puppOption {
   headless: boolean; // display mode
+  executablePath: string; // exepath
   ignoreDefaultArgs: string[]; // ignore extensions
   args: string[]; // args
 }
 
 // class
 export class Scrape {
-  static adblock: boolean; // adblock flg
   static logger: any; // logger
   static browser: any; // static browser
   static page: any; // static page
@@ -33,46 +40,35 @@ export class Scrape {
 
   // constractor
   constructor(logger: any) {
-    // loggeer instance
-    Scrape.logger = logger;
     // result
     this._result = false;
+    Scrape.logger = logger;
     Scrape.logger.silly('scrape: constructed');
   }
 
   // initialize
-  init(flg: boolean = false): Promise<void> {
+  init(): Promise<void> {
     return new Promise(async (resolve, reject) => {
       try {
         Scrape.logger.silly('scrape: initialize mode.');
-        // loggeer instance
-        Scrape.adblock = flg;
-        // pupp option
         const puppOptions: puppOption = {
           headless: true, // no display mode
-          ignoreDefaultArgs: [], // ignore extensions
+          executablePath: getChromePath(), // chrome.exe path
+          ignoreDefaultArgs: [DISABLE_EXTENSIONS], // ignore extensions
           args: [], // args
         };
+
         // lauch browser
         Scrape.browser = await puppeteer.launch(puppOptions);
-        // get all tabs
-        Scrape.page = (await Scrape.browser.pages())[0];
-
-        // use adblock
-        if (Scrape.adblock) {
-          Scrape.logger.silly('scrape: adblock mode.');
-          // set adblock
-          PuppeteerBlocker.fromPrebuiltAdsAndTracking(fetch).then((blocker) => {
-            Scrape.logger.silly('scrape: adblock finished.');
-            blocker.enableBlockingInPage(Scrape.page);
-          });
-        }
-
+        // create new page
+        Scrape.page = await Scrape.browser.newPage();
         // set viewport
         Scrape.page.setViewport({
           width: 1920,
           height: 1000,
         });
+        // disable timeout
+        await Scrape.page.setDefaultNavigationTimeout(0);
         // mimic agent
         await Scrape.page.setUserAgent(generateRandomUA());
         Scrape.logger.silly('scrape: initialize finished.');
@@ -108,8 +104,10 @@ export class Scrape {
     return new Promise(async (resolve, reject) => {
       try {
         Scrape.logger.silly('scrape: getTitle mode.');
+        // page title
+        const tmpTitle: string = await Scrape.page.title();
         // resolved
-        resolve(await Scrape.page.title);
+        resolve(tmpTitle);
 
       } catch (e: unknown) {
         Scrape.logger.error(e);
@@ -158,9 +156,12 @@ export class Scrape {
     return new Promise(async (resolve, reject) => {
       try {
         Scrape.logger.silly('scrape: doGo mode.');
-        // goto target page
-        Scrape.logger.silly(targetPage);
-        await Scrape.page.goto(targetPage);
+        await Promise.all([
+          // goto target page
+          Scrape.page.goto(targetPage),
+          // wait for time
+          Scrape.page.waitForNavigation({ waitUntil: 'load' }),
+        ]);
         // resolved
         resolve();
 
@@ -177,8 +178,12 @@ export class Scrape {
     return new Promise(async (resolve, reject) => {
       try {
         Scrape.logger.silly('scrape: doGoBack mode.');
-        // go back
-        await Scrape.page.goBack();
+        await Promise.all([
+          // go back
+          Scrape.page.goBack(),
+          // wait for time
+          Scrape.page.waitForNavigation({ waitUntil: 'load' }),
+        ]);
         // resolved
         resolve();
 
@@ -195,8 +200,13 @@ export class Scrape {
     return new Promise(async (resolve, reject) => {
       try {
         Scrape.logger.silly('scrape: doClick mode.');
-        // click target element
-        await Scrape.page.$$eval(elem, (elements: any) => elements[0].click());
+        await Promise.all([
+          // click target element
+          Scrape.page.$$eval(elem, (elements: any) => elements[0].click()),
+          // wait for time
+          Scrape.page.waitForNavigation({ waitUntil: 'load' }),
+        ]);
+
         // resolved
         resolve();
 
@@ -245,18 +255,12 @@ export class Scrape {
   }
 
   // select
-  doSelect(elem: string, value: any): Promise<void> {
+  doSelect(elem: string): Promise<void> {
     return new Promise(async (resolve, reject) => {
       try {
         Scrape.logger.silly('scrape: doSelect mode.');
-        // wait for load
-        await Promise.all([
-          // select dropdown element
-          Scrape.page.select(elem, value),
-          // wait for time
-          this.doWaitFor(2000),
-        ]);
-        Scrape.logger.silly('scrape: doSelect finished.');
+        // select dropdown element
+        await Scrape.page.select(elem);
         // resolved
         resolve();
 
@@ -290,6 +294,7 @@ export class Scrape {
   doSingleEval(selector: string, property: string): Promise<string> {
     return new Promise(async (resolve, _) => {
       try {
+        //Scrape.logger.silly('scrape: doSingleEval mode.');
         // target item
         const exists: boolean = await Scrape.page.$eval(selector, () => true).catch(() => false);
 
@@ -351,14 +356,52 @@ export class Scrape {
           }
           // resolved
           resolve(datas);
-        } else {
-          resolve([]);
         }
 
       } catch (e: unknown) {
         Scrape.logger.error(e);
         // reject
-        resolve([]);
+        reject('error');
+      }
+    });
+  }
+
+  // get all html
+  getAllTexts(): Promise<any> {
+    return new Promise(async (resolve, reject) => {
+      try {
+        Scrape.logger.silly('scrape: getAllTexts mode.');
+        // target list
+        const data = await Scrape.page.evaluate(() => document.querySelector('html body')!.outerHTML);
+        // links
+        resolve(data);
+
+      } catch (e: unknown) {
+        Scrape.logger.error(e);
+        // reject
+        reject();
+      }
+    });
+  }
+
+  // get all links
+  getAllLinks(): Promise<string[]> {
+    return new Promise(async (resolve, reject) => {
+      try {
+        Scrape.logger.silly('scrape: getAllLinks mode.');
+        // wait for time
+        const links = await Scrape.page.evaluate(() => {
+          // get all a elements
+          const anchors = Array.from(document.querySelectorAll('a'));
+          return anchors.map(anchor => anchor.href);
+        });
+        // links
+        resolve(links);
+
+      } catch (e: unknown) {
+        Scrape.logger.error(e);
+        // reject
+        reject();
       }
     });
   }
@@ -367,7 +410,7 @@ export class Scrape {
   doWaitFor(time: number): Promise<void> {
     return new Promise(async (resolve, reject) => {
       try {
-        //Scrape.logger.silly('scrape: doWaitFor mode.');
+        Scrape.logger.silly('scrape: doWaitFor mode.');
         // wait for time
         await setTimeout(time);
         resolve();
@@ -384,10 +427,9 @@ export class Scrape {
   doWaitSelector(elem: string, time: number): Promise<void> {
     return new Promise(async (resolve, reject) => {
       try {
-        Scrape.logger.silly('scrape: doWaitSelector mode.');
+        Scrape.logger.silly("scrape: doWaitSelector start.");
         // target item
         const exists: boolean = await Scrape.page.$eval(elem, () => true).catch(() => false);
-
         // if element exists
         if (exists) {
           // wait for loading selector
@@ -395,25 +437,11 @@ export class Scrape {
           // resolved
           resolve();
         }
-
-      } catch (e: unknown) {
-        Scrape.logger.error(e);
         // reject
         reject();
-      }
-    });
-  }
-
-  // wait for navigaion
-  doWaitForNav(time: number): Promise<void> {
-    return new Promise(async (resolve, reject) => {
-      try {
-        Scrape.logger.silly('scrape: doWaitForNav mode.');
-        // wait for time
-        await Scrape.page.waitForNavigation({ waitUntil: 'networkidle2', timeout: time });
-        resolve();
-
+        Scrape.logger.silly("scrape: doWaitSelector end.");
       } catch (e: unknown) {
+        // error
         Scrape.logger.error(e);
         // reject
         reject();
@@ -505,6 +533,31 @@ export class Scrape {
   }
 }
 
+// get chrome absolute path
+const getChromePath = (): string => {
+  // chrome tmp path
+  const tmpPath: string = path.join(USER_ROOT_PATH, CHROME_EXEC_PATH3);
+
+  // 32bit
+  if (fs.existsSync(CHROME_EXEC_PATH1)) {
+    return CHROME_EXEC_PATH1 ?? '';
+
+    // 64bit
+  } else if (fs.existsSync(CHROME_EXEC_PATH2)) {
+    return CHROME_EXEC_PATH2 ?? '';
+
+    // user path
+  } else if (fs.existsSync(tmpPath)) {
+    return tmpPath ?? '';
+
+    // error
+  } else {
+    // error logging
+    Scrape.logger.silly('16: no chrome path error');
+    return '';
+  }
+}
+
 // get random ua
 const generateRandomUA = (): string => {
   // Array of random user agents
@@ -513,24 +566,10 @@ const generateRandomUA = (): string => {
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36',
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36',
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3864.0 Safari/537.36',
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
     'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.1 Safari/605.1.15',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 13_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.1 Safari/605.1.15',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.13; rv:62.0) Gecko/20100101 Firefox/62.0',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.13; rv:67.0) Gecko/20100101 Firefox/67.0',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.13; rv:68.0) Gecko/20100101 Firefox/68.0',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:62.0) Gecko/20100101 Firefox/62.0',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:92.0) Gecko/20100101 Firefox/92.0',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36 Edge/17.17134',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36 Edg/94.0.992.31',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.0 Safari/605.1.15'
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 13_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.1 Safari/605.1.15'
   ];
   // Get a random index based on the length of the user agents array 
   const randomUAIndex = Math.floor(Math.random() * userAgents.length);
